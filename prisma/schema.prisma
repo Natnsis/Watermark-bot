@@ -32,7 +32,9 @@ model Watermark {
 
 model Refinement {
   id          Int       @id @default(autoincrement())
-  type        String    // 'grammar', 'funny', 'professional'
+  grammarRef  Boolean
+  funnyRef    Boolean
+  professional Boolean
   user        User      @relation(fields: [userId], references: [id])
   userId      Int
   description String?   // optional, for extra info
