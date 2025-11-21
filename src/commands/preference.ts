@@ -34,7 +34,7 @@ export const PreferenceCommand = (bot: Telegraf<Context>) => {
       await actionCtx.answerCbQuery();
 
       await actionCtx.editMessageText(
-        'Do you want me to make it professional?☝️',
+        'Do you want me to make it professional?(too formal)☝️',
         Markup.inlineKeyboard([
           Markup.button.callback('Yes', 'prof_yes'),
           Markup.button.callback('No', 'prof_no'),
