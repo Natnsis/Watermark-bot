@@ -16,6 +16,7 @@ export const startCommand = (bot: Telegraf<Context>) => {
           `Here is what i can do: \n` +
           `🌟 /start - Show this Welcome message \n` +
           `📋 /help - List all Commands \n` +
+          `😸 /preference - Select your post refinment Preferences (grammar by default) \n` +
           `🔗 /watermark - Add a watermark to your messages \n` +
           `🤖 /post - To refine your messages with your preferences`,
         parse_mode: 'Markdown',
