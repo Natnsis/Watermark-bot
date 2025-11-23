@@ -5,7 +5,7 @@ import { startCommand } from './commands/start';
 import { helpCommand } from './commands/help';
 import { WatermarkCommand } from './commands/watermark';
 import { PreferenceCommand } from './commands/preference';
-import { PostCommand } from './commands/post';
+import { PostCommannd } from './commands/post';
 dotenv.config();
 
 //constants
@@ -16,7 +16,7 @@ startCommand(bot);
 helpCommand(bot);
 WatermarkCommand(bot);
 PreferenceCommand(bot);
-PostCommand(bot);
+PostCommannd(bot);
 
 bot.launch();
 

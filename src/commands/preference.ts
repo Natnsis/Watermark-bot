@@ -46,9 +46,8 @@ export const PreferenceCommand = (bot: Telegraf<Context>) => {
       userChoices.professional = actionCtx.match[1] === 'yes' ? true : false;
       await actionCtx.answerCbQuery();
 
-      // Send final summary
       await actionCtx.editMessageText(
-        `Your choices:\n- Fix Grammar: ${userChoices.grammar}\n- Make it Funny: ${userChoices.funny}\n- Make it Professional: ${userChoices.professional}`
+        `Your choices:\n- Fix Grammar: ${userChoices.grammar}\n- Make it Funny: ${userChoices.funny}\n- Make it Professional: ${userChoices.professional}\n \n /post so i can refine your text now`
       );
     });
   });
