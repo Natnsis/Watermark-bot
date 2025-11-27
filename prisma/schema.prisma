@@ -39,9 +39,9 @@ model Watermark {
 
 model Refinement {
   id           Int     @id @default(autoincrement())
-  userId       String 
+  userId       String  @unique 
   funnyRef     Boolean
   grammarRef   Boolean
   professional Boolean
-  user         User    @relation(fields: [userId], references: [id])
+  user         User    @relation(fields: [userId], references: [telegramId])
 }
