@@ -122,13 +122,9 @@ export const PostCommand = (bot: Telegraf<Context>) => {
       // handle fallback / errors explicitly
       if (result.fallback) {
         // If fallback and no credentials present, notify the user
-        if (
-          !process.env.GEMINI_API_KEY &&
-          !process.env.GEMINI_BEARER_TOKEN &&
-          !process.env.GOOGLE_ACCESS_TOKEN
-        ) {
+        if (!process.env.GEMINI_API_KEY) {
           await ctx.reply(
-            "⚠️ Gemini is not configured (GEMINI_API_KEY or GEMINI_BEARER_TOKEN missing). The text was returned unchanged."
+            "⚠️ Gemini is not configured (GEMINI_API_KEY missing). The text was returned unchanged."
           );
         } else {
           // Non-config / network error; log and inform user

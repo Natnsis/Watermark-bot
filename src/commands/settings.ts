@@ -2,8 +2,6 @@ import { Telegraf, Context } from "telegraf";
 import { refineText } from "../lib/gemini";
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const BEARER_TOKEN =
-  process.env.GEMINI_BEARER_TOKEN || process.env.GOOGLE_ACCESS_TOKEN;
 const MODEL = process.env.GEMINI_MODEL || "text-bison-001";
 
 export const SettingsCommand = (bot: Telegraf<Context>) => {
@@ -13,7 +11,7 @@ export const SettingsCommand = (bot: Telegraf<Context>) => {
 
     await ctx.reply(
       `Checking Gemini configuration...\nModel: ${MODEL}\nAuth: ${
-        BEARER_TOKEN ? "Bearer token" : API_KEY ? "API key" : "None"
+        API_KEY ? "API key" : "None"
       }`
     );
 
@@ -29,9 +27,9 @@ export const SettingsCommand = (bot: Telegraf<Context>) => {
           );
           return;
         }
-        if (!API_KEY && !BEARER_TOKEN) {
+        if (!API_KEY) {
           await ctx.reply(
-            "⚠️ No Gemini API key or token was found. Please set `GEMINI_API_KEY` or `GEMINI_BEARER_TOKEN` in your environment and retry."
+            "⚠️ No Gemini API key found. Please set `GEMINI_API_KEY` in your environment and retry."
           );
           return;
         }

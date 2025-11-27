@@ -88,12 +88,12 @@ export const WatermarkCommand = (bot: Telegraf<Context>) => {
 
       // Save or upsert the channel
       const telegramId = chatId.toString();
-      let channel = await prisma.channel.findUnique({ where: { telegramId } });
-      if (!channel) {
-        channel = await prisma.channel.create({
-          data: { telegramId, name: chatTitle },
-        });
-      }
+      // Upsert channel to avoid unique constraint races when multiple users register same channel concurrently.
+      let channel = await prisma.channel.upsert({
+        where: { telegramId },
+        update: { name: chatTitle },
+        create: { telegramId, name: chatTitle },
+      });
 
       // Connect or update the user to link to this channel
       const user = await prisma.user.upsert({

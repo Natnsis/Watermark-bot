@@ -1,12 +1,11 @@
 import "dotenv/config";
+import { GoogleGenAI } from "@google/genai";
 
 // Simple Gemini wrapper using Google's Generative Language REST endpoint.
 // NOTE: This is a minimal wrapper and may need to be adapted to any auth (API key / OAuth) you're using.
 // Set GEMINI_API_KEY and GEMINI_MODEL in your .env file. Example model: "text-bison-001" or "gemini-pro"
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const BEARER_TOKEN =
-  process.env.GEMINI_BEARER_TOKEN || process.env.GOOGLE_ACCESS_TOKEN;
 const MODEL = process.env.GEMINI_MODEL || "text-bison-001";
 
 interface RefinementOptions {
@@ -26,10 +25,10 @@ export async function refineText(
   input: string,
   options?: RefinementOptions
 ): Promise<GeminiResult> {
-  // If there's no GEMINI API key nor a bearer token, return the message unchanged as a fallback.
-  if (!API_KEY && !BEARER_TOKEN) {
+  // If there's no GEMINI API key, return the message unchanged as a fallback.
+  if (!API_KEY) {
     console.warn(
-      "GEMINI_API_KEY and GEMINI_BEARER_TOKEN are not set — returning original input as fallback."
+      "GEMINI_API_KEY is not set — returning original input as fallback."
     );
     return { text: input, fallback: true, error: "no-credentials" };
   }
@@ -68,52 +67,24 @@ export async function refineText(
     " IMPORTANT: Return ONLY the final refined text as a single message. Do NOT add any explanations, lists of changes, suggestions, comments, or questions; do NOT ask the user anything.";
 
   const prompt = `${instructions}\n\nText:\n${input}`;
-
-  let endpoint = `https://generativelanguage.googleapis.com/v1beta2/models/${MODEL}:generate`;
-
+  // Use official Google GenAI client when possible
+  const client = new GoogleGenAI({ apiKey: API_KEY });
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (BEARER_TOKEN) {
-      headers["Authorization"] = `Bearer ${BEARER_TOKEN}`;
-    }
-
-    if (!BEARER_TOKEN && API_KEY) {
-      endpoint = endpoint + `?key=${API_KEY}`;
-    }
-
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        prompt: {
-          text: prompt,
-        },
-        // maxOutputTokens and other params can be adjusted if needed
-        maxOutputTokens: 512,
-      }),
-    });
-
-    if (!res.ok) {
-      const error = await res.text();
-      console.error("Gemini API returned non-ok status", res.status, error);
-      return {
-        text: input,
-        fallback: true,
-        error: "http-error",
-        status: res.status,
-      };
-    }
-
-    const data = await res.json();
+    const response = await client.models.generateContent({
+      model: MODEL,
+      // Use a single content string for simplicity
+      contents: prompt,
+      maxOutputTokens: 512,
+    } as any);
 
     // The Google Generative Language API for v1beta2 returns 'candidates' in the `output` object.
     // We try to safely pick something that looks like generated text.
+    // Prefer `response.text` if available, else fall back to known nested fields
     const generated =
-      (data?.candidates && data.candidates[0] && data.candidates[0].content) ||
-      data?.output?.[0]?.content ||
-      data?.output?.[0]?.text;
+      (response as any)?.text ||
+      (response as any)?.candidates?.[0]?.content ||
+      (response as any)?.output?.[0]?.content ||
+      (response as any)?.output?.[0]?.text;
 
     if (!generated) {
       console.warn(
