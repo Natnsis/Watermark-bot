@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  telegramId  String       @unique
+  name        String?
+  channelId   Int?
+  refinements Refinement[]
+  channel     Channel?     @relation(fields: [channelId], references: [id])
+}
+
+model Channel {
+  id         Int         @id @default(autoincrement())
+  telegramId String      @unique
+  name       String?
+  users      User[]
+  watermarks Watermark[]
+}
+
+model Watermark {
+  id        Int     @id @default(autoincrement())
+  text      String
+  channelId Int
+  channel   Channel @relation(fields: [channelId], references: [id])
+}
+
+model Refinement {
+  id           Int     @id @default(autoincrement())
+  userId       Int
+  description  String?
+  funnyRef     Boolean
+  grammarRef   Boolean
+  professional Boolean
+  user         User    @relation(fields: [userId], references: [id])
+}
