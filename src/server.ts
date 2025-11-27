@@ -1,16 +1,26 @@
-import express, { Request, Response } from 'express'
-import { prisma } from './lib/prisma';
-import dotenv from 'dotenv'
+import express from 'express';
+import dotenv from 'dotenv';
 dotenv.config();
 
+import { Telegraf } from 'telegraf';
+import { startCommand } from './commands/start';
+import { PostCommand } from './commands/post';
+import { PreferenceCommand } from './commands/preference';
+import { WatermarkCommand } from './commands/watermark';
+import { helpCommand } from './commands/help';
 
 const app = express();
 
-app.get('/', async (req: Request, res: Response) => {
-  const data = await prisma.user.findMany()
-  res.json(data)
-})
+const bot = new Telegraf(process.env.BOT_TOKEN!);
+
+startCommand(bot);
+PostCommand(bot);
+PreferenceCommand(bot);
+WatermarkCommand(bot);
+helpCommand(bot);
+
+bot.launch();
 
 app.listen(process.env.PORT, () => {
-  console.log(`server running on port ${process.env.PORT}`)
-})
+  console.log(`server running on port ${process.env.PORT}`);
+});

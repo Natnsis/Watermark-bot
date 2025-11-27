@@ -1,33 +1,33 @@
 import { Telegraf, Context } from 'telegraf';
 import { prisma } from '../lib/prisma';
 
-type UserData = {
-  id: string;
-  first_name: string;
-};
-
 export const PostCommand = (bot: Telegraf<Context>) => {
   bot.command('post', async ctx => {
     try {
-      const user: UserData = ctx.from;
-      if (!user) return ctx.reply('unable to fetch user data');
+      const user = ctx.from;
+      if (!user) return ctx.reply('Unable to fetch user data');
 
-      //check existance
-      const exists = await prisma.user.findMany({
-        where: { telegramId: user.id },
+      const userExists = await prisma.user.findUnique({
+        where: { telegramId: user.id.toString() },
       });
 
-      if (!exists) {
+      if (!userExists) {
         await prisma.user.create({
           data: {
-            telegramId: user.id,
+            telegramId: user.id.toString(),
             name: user.first_name ?? 'unknown',
           },
         });
-        await ctx.reply(`user has been saved with id of ${user.id}`);
       }
+      await ctx.reply('alright send your post text');
+      bot.on('text', async (ctx) => {
+        const message = ctx.message.text;
+        await ctx.reply(`you have sent ${message}`)
+      })
+
     } catch (e) {
-      console.log(e);
+      console.error(e);
+      await ctx.reply('An error occurred while processing your request.');
     }
   });
 };

@@ -1,4 +1,5 @@
 import { Telegraf, Context, Markup } from 'telegraf';
+import { prisma } from '../lib/prisma';
 
 export const PreferenceCommand = (bot: Telegraf<Context>) => {
   bot.command('preference', async ctx => {
@@ -45,10 +46,26 @@ export const PreferenceCommand = (bot: Telegraf<Context>) => {
     bot.action(/prof_(yes|no)/, async actionCtx => {
       userChoices.professional = actionCtx.match[1] === 'yes' ? true : false;
       await actionCtx.answerCbQuery();
-
+      const user = ctx.from;
+      await prisma.refinement.create({
+        data: {
+          userId: user.id.toString(),
+          funnyRef: userChoices.funny!,
+          grammarRef: userChoices.grammar!,
+          professional: userChoices.professional!,
+        }
+      })
       await actionCtx.editMessageText(
         `Your choices:\n- Fix Grammar: ${userChoices.grammar}\n- Make it Funny: ${userChoices.funny}\n- Make it Professional: ${userChoices.professional}\n \n /post so i can refine your text now`
       );
     });
   });
 };
+
+/*
+  userId       Int
+  description  String?
+  funnyRef     Boolean
+  grammarRef   Boolean
+  professional Boolean
+*/

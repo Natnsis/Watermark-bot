@@ -39,8 +39,7 @@ model Watermark {
 
 model Refinement {
   id           Int     @id @default(autoincrement())
-  userId       Int
-  description  String?
+  userId       String 
   funnyRef     Boolean
   grammarRef   Boolean
   professional Boolean
