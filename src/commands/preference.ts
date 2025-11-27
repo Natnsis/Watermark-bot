@@ -4,27 +4,42 @@ import { prisma } from '../lib/prisma';
 const tempChoices: Record<string, { grammar?: boolean; funny?: boolean; professional?: boolean }> = {};
 
 export const PreferenceCommand = (bot: Telegraf<Context>) => {
-
   bot.command('preference', async ctx => {
     const userId = ctx.from?.id.toString();
     if (!userId) return;
 
-    console.log('/preference command triggered', userId);
-
+    // Check if user already has preferences
     const existingRefinement = await prisma.refinement.findUnique({ where: { userId } });
+
     if (existingRefinement) {
+      // Ask if user wants to edit existing preferences
       await ctx.reply(
         `🎯 You already have saved preferences:\n` +
         `• Fix Grammar: ${existingRefinement.grammarRef ? '✅ Yes' : '❌ No'}\n` +
         `• Make it Funny: ${existingRefinement.funnyRef ? '✅ Yes' : '❌ No'}\n` +
         `• Make it Professional: ${existingRefinement.professional ? '✅ Yes' : '❌ No'}\n\n` +
-        `Send /preference again if you want to update them.`
+        `Do you want to edit them?`,
+        Markup.inlineKeyboard([
+          Markup.button.callback('✏️ Edit Preferences', 'edit_pref')
+        ])
       );
       return;
     }
 
+    // If no existing preferences, show the form directly
     tempChoices[userId] = {};
+    await showPreferenceForm(ctx, userId);
+  });
 
+  // Edit button handler
+  bot.action('edit_pref', async actionCtx => {
+    const userId = actionCtx.from.id.toString();
+    tempChoices[userId] = {};
+    await actionCtx.answerCbQuery();
+    await showPreferenceForm(actionCtx, userId);
+  });
+
+  const showPreferenceForm = async (ctx: any, userId: string) => {
     await ctx.reply(
       '📖 Do you want me to fix the grammar?',
       Markup.inlineKeyboard([
@@ -32,8 +47,9 @@ export const PreferenceCommand = (bot: Telegraf<Context>) => {
         Markup.button.callback('❌ No', 'grammar_no'),
       ])
     );
-  });
+  };
 
+  // Handlers for the inline button steps
   bot.action(/grammar_(yes|no)/, async actionCtx => {
     const userId = actionCtx.from.id.toString();
     tempChoices[userId].grammar = actionCtx.match[1] === 'yes';
