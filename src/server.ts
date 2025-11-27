@@ -12,27 +12,34 @@ import { helpCommand } from "./commands/help";
 import { SettingsCommand } from "./commands/settings";
 
 const app = express();
-
 const bot = new Telegraf(process.env.BOT_TOKEN!);
 
-startCommand(bot);
-PostCommand(bot);
-PreferenceCommand(bot);
-WatermarkCommand(bot);
-helpCommand(bot);
-SettingsCommand(bot);
+// Register commands
+[startCommand, PostCommand, PreferenceCommand, WatermarkCommand, helpCommand, SettingsCommand].forEach(
+  (command) => command(bot)
+);
 
-// Handle channel post – attempt to append watermark to channel messages
+// Helper function to safely get text or caption
+const getPostContent = (post: any) => {
+  if (!post) return null;
+  if ("text" in post && typeof post.text === "string") return { type: "text", content: post.text };
+  if ("caption" in post && typeof post.caption === "string") return { type: "caption", content: post.caption };
+  return null;
+};
+
+// Handle channel posts and append watermark
 bot.on("channel_post", async (ctx) => {
-  const channelChat = ctx.channelPost?.chat;
-  if (!channelChat) return;
-  const telegramId = channelChat.id.toString();
-  const messageId = ctx.channelPost?.message_id;
+  const post = ctx.channelPost;
+  const chat = post?.chat;
+  if (!chat || !post) return;
+
+  const telegramId = chat.id.toString();
+  const messageId = post.message_id;
   if (!messageId) return;
 
   try {
     const channel = await prisma.channel.findUnique({ where: { telegramId } });
-    if (!channel) return; // nothing to do for this channel
+    if (!channel) return;
 
     const watermark = await prisma.watermark.findFirst({
       where: { channelId: channel.id },
@@ -40,37 +47,30 @@ bot.on("channel_post", async (ctx) => {
     });
     if (!watermark) return;
 
-    // If it's a text post, edit the text. If it's media with a caption, edit the caption.
-    if (ctx.channelPost?.text) {
-      const newText = `${ctx.channelPost.text}\n\n${watermark.text}`;
-      await bot.telegram.editMessageText(
-        channelChat.id,
-        messageId,
-        undefined,
-        newText,
-        { parse_mode: "Markdown" }
-      );
-    } else if (ctx.channelPost?.caption) {
-      const newCaption = `${ctx.channelPost.caption}\n\n${watermark.text}`;
-      await bot.telegram.editMessageCaption(
-        channelChat.id,
-        messageId,
-        undefined,
-        newCaption,
-        { parse_mode: "Markdown" }
-      );
+    const postContent = getPostContent(post);
+    if (!postContent) return;
+
+    if (postContent.type === "text") {
+      await bot.telegram.editMessageText(chat.id, messageId, undefined, `${postContent.content}\n\n${watermark.text}`, {
+        parse_mode: "Markdown",
+      });
+    } else if (postContent.type === "caption") {
+      await bot.telegram.editMessageCaption(chat.id, messageId, undefined, `${postContent.content}\n\n${watermark.text}`, {
+        parse_mode: "Markdown",
+      });
     }
-  } catch (e) {
-    console.error("Unable to append watermark to channel post", e);
+  } catch (error) {
+    console.error("Unable to append watermark to channel post:", error);
   }
+});
+
+// Health check endpoint
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({ message: "server is healthy" });
 });
 
 bot.launch();
 
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ message: "server is healthy" })
-})
-
 app.listen(process.env.PORT, () => {
-  console.log(`server running on port ${process.env.PORT}`);
+  console.log(`Server running on port ${process.env.PORT}`);
 });

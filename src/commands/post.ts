@@ -31,8 +31,7 @@ export const PostCommand = (bot: Telegraf<Context>) => {
       `Your refinement options are:\n` +
       `• Funny: ${refinement?.funnyRef ?? false ? "✅ Yes" : "❌ No"}\n` +
       `• Grammar: ${refinement?.grammarRef ?? true ? "✅ Yes" : "❌ No"}\n` +
-      `• Professional: ${
-        refinement?.professional ?? false ? "✅ Yes" : "❌ No"
+      `• Professional: ${refinement?.professional ?? false ? "✅ Yes" : "❌ No"
       }\n\n` +
       `Do you want to edit them or are they fine?`;
 
@@ -129,8 +128,7 @@ export const PostCommand = (bot: Telegraf<Context>) => {
         } else {
           // Non-config / network error; log and inform user
           await ctx.reply(
-            `⚠️ Gemini returned an error (${result.error}${
-              result.status ? ` - ${result.status}` : ``
+            `⚠️ Gemini returned an error (${result.error}${result.status ? ` - ${result.status}` : ``
             }). The text was returned unchanged.`
           );
         }
