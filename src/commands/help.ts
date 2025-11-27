@@ -3,14 +3,32 @@ import { Telegraf, Context } from "telegraf";
 export const helpCommand = (bot: Telegraf<Context>) => {
   bot.help((ctx) => {
     ctx.reply(
-      "Hi there! I am Poster Boi — I help you prepare posts for your channels and attach a watermark.\n\n" +
-        "How to use:\n" +
-        "• /start - Welcome message and quick commands overview\n" +
-        "• /help - This message\n" +
-        "• /preference - Select how I should refine your posts (grammar, funny, professional)\n" +
-        "• /post - Start composing a refined post; follow prompts\n" +
-        "• /watermark - Register your channel and set the watermark text; you must forward a channel message or send the channel username (e.g. @mychannel), and add me as an admin with edit rights to the channel for watermarking to work\n\n" +
-        "If you need help with the /post flow, send /post and follow the prompts. I use a model (Gemini) to refine posts according to your preferences, so set your preferences with /preference. I only edit channel messages when I have admin privileges and a watermark configured for that channel."
+      `🌟 *Poster Boi — Your Post Refinement Assistant* \n\n` +
+        `I help you craft polished, publish-ready posts and optionally attach a watermark to posts in your channels. Use the commands below to get started.` +
+        `\n\n*Quick commands:*\n` +
+        `• /start — Welcome message and quick overview\n` +
+        `• /help — This message\n` +
+        `• /preference — Choose how I refine posts (grammar, funny, professional)\n` +
+        `• /post — Compose a post and get a polished result from the AI\n` +
+        `• /watermark — Register a channel and set a watermark to automatically attach to channel posts\n\n` +
+        `---\n*How /post works* 🤖\n` +
+        `1) Send \/post in private chat — I'll show your current preferences.\n` +
+        `2) Confirm or edit preferences.\n` +
+        `3) When prompted, send the text you want refined.\n` +
+        `4) I’ll show a loading indicator, call the AI (Gemini), and return the refined text.\n` +
+        `_Example:_\nOriginal: "i is running around yesterday, then a dog bit me"\nRefined: "I was walking yesterday when a dog came up to me and bit me. The neighbors helped me get away."\n\n` +
+        `---\n*How /watermark works* 🔖\n` +
+        `1) Send \/watermark in private chat.\n` +
+        `2) Forward any message from your channel OR send the channel username (eg. @mychannel) so I can find and save the channel ID.\n` +
+        `3) I’ll ask for the watermark text (short signature or caption) and save it.\n` +
+        `4) Add me to the channel as admin with permission to edit messages — this is required for me to append the watermark to messages posted in that channel.\n` +
+        `_Note:_ Watermarking works by editing channel posts; if the bot doesn’t have edit rights, it won’t be able to attach the watermark.\n\n` +
+        `---\n*Tips & Troubleshooting* ⚠️\n` +
+        `• Use \/settings to test your AI model connection (Gemini) and confirm your API key is valid.\n` +
+        `• If you see your original text returned unchanged, the AI key may be missing or invalid — check \.env and run \/settings.\n` +
+        `• For professional posts, choose the "Professional" preference to avoid emojis; for lighter/funny posts, select "Funny".\n\n` +
+        `If you need help, send /help or message the bot owner. Happy posting!`,
+      { parse_mode: "Markdown" }
     );
   });
 };

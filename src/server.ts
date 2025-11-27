@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -66,6 +66,10 @@ bot.on("channel_post", async (ctx) => {
 });
 
 bot.launch();
+
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ message: "server is healthy" })
+})
 
 app.listen(process.env.PORT, () => {
   console.log(`server running on port ${process.env.PORT}`);

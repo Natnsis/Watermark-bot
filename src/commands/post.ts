@@ -151,7 +151,7 @@ export const PostCommand = (bot: Telegraf<Context>) => {
       );
     } catch (e) {
       // If editing failed (e.g., message too old), reply instead
-      await ctx.reply(`Refined message:\n\n${refined}`);
+      await ctx.reply(`${refined}`);
     }
 
     delete waitingForPost[userId];

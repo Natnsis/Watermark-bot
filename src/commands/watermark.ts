@@ -38,107 +38,121 @@ export const WatermarkCommand = (bot: Telegraf<Context>) => {
 
     // If user is waiting for channel info
     if (waitingForChannel[userId]) {
-      // If forwarded from a chat, use forwarded chat info
-      const forwarded = (ctx.message as any)?.forward_from_chat as
-        | any
-        | undefined;
-      let chatId: number | undefined;
-      let chatTitle: string | undefined;
+      try {
+        // If forwarded from a chat, use forwarded chat info
+        const forwarded = (ctx.message as any)?.forward_from_chat as
+          | any
+          | undefined;
+        let chatId: number | undefined;
+        let chatTitle: string | undefined;
 
-      if (forwarded) {
-        chatId = forwarded.id;
-        chatTitle = forwarded.title;
-      } else if ((ctx.message as any)?.text) {
-        const text = ((ctx.message as any).text as string).trim();
-        // If user supplied @username or https://t.me/username
-        if (text.startsWith("@")) {
-          try {
-            const chat = await bot.telegram.getChat(text);
-            chatId = chat.id;
-            chatTitle = (chat as any).title ?? text;
-          } catch (e) {
-            await ctx.reply(
-              "Could not find that channel. Please make sure the username is correct and the bot can access it."
-            );
-            return;
-          }
-        } else if (text.startsWith("https://t.me/")) {
-          const username = text.split("/").pop();
-          if (username) {
+        if (forwarded) {
+          chatId = forwarded.id;
+          chatTitle = forwarded.title;
+        } else if ((ctx.message as any)?.text) {
+          const text = ((ctx.message as any).text as string).trim();
+          // If user supplied @username or https://t.me/username
+          if (text.startsWith("@")) {
             try {
-              const chat = await bot.telegram.getChat("@" + username);
+              const chat = await bot.telegram.getChat(text);
               chatId = chat.id;
-              chatTitle = (chat as any).title ?? username;
+              chatTitle = (chat as any).title ?? text;
             } catch (e) {
               await ctx.reply(
-                "Could not find that channel. Please ensure the link is correct and I have access."
+                "Could not find that channel. Please make sure the username is correct and the bot can access it."
               );
               return;
             }
+          } else if (text.startsWith("https://t.me/")) {
+            const username = text.split("/").pop();
+            if (username) {
+              try {
+                const chat = await bot.telegram.getChat("@" + username);
+                chatId = chat.id;
+                chatTitle = (chat as any).title ?? username;
+              } catch (e) {
+                await ctx.reply(
+                  "Could not find that channel. Please ensure the link is correct and I have access."
+                );
+                return;
+              }
+            }
           }
         }
-      }
 
-      if (!chatId) {
+        if (!chatId) {
+          await ctx.reply(
+            "Please forward a message from the channel or send the channel username starting with @"
+          );
+          return;
+        }
+
+        // Save or upsert the channel
+        const telegramId = chatId.toString();
+        // Upsert channel to avoid unique constraint races when multiple users register same channel concurrently.
+        let channel = await prisma.channel.upsert({
+          where: { telegramId },
+          update: chatTitle ? { name: chatTitle } : {},
+          create: { telegramId, name: chatTitle },
+        });
+
+        // Connect or update the user to link to this channel
+        const user = await prisma.user.upsert({
+          where: { telegramId: userId },
+          create: {
+            telegramId: userId,
+            name: ctx.from?.first_name ?? "unknown",
+            channelId: channel.id,
+          },
+          update: { channelId: channel.id },
+        });
+
+        // Ask for watermark text and move to next step
+        waitingForWatermarkText[userId] = channel.id;
+        waitingForChannel[userId] = false;
+
         await ctx.reply(
-          "Please forward a message from the channel or send the channel username starting with @"
+          "Nice! Now send the watermark text you want to attach to messages in that channel."
+        );
+        return;
+      } catch (e) {
+        console.error("Error while saving channel or linking user", e);
+        await ctx.reply(
+          "❌ Something went wrong while registering your channel. Please try again."
         );
         return;
       }
-
-      // Save or upsert the channel
-      const telegramId = chatId.toString();
-      // Upsert channel to avoid unique constraint races when multiple users register same channel concurrently.
-      let channel = await prisma.channel.upsert({
-        where: { telegramId },
-        update: { name: chatTitle },
-        create: { telegramId, name: chatTitle },
-      });
-
-      // Connect or update the user to link to this channel
-      const user = await prisma.user.upsert({
-        where: { telegramId: userId },
-        create: {
-          telegramId: userId,
-          name: ctx.from?.first_name ?? "unknown",
-          channelId: channel.id,
-        },
-        update: { channelId: channel.id },
-      });
-
-      // Ask for watermark text and move to next step
-      waitingForWatermarkText[userId] = channel.id;
-      waitingForChannel[userId] = false;
-
-      await ctx.reply(
-        "Nice! Now send the watermark text you want to attach to messages in that channel."
-      );
-      return;
     }
 
     // If user is in the watermark text step, create a watermark record
     if (waitingForWatermarkText[userId]) {
-      const channelId = waitingForWatermarkText[userId];
-      const watermarkText = ((ctx.message as any)?.text ??
-        (ctx.message as any)?.caption ??
-        "") as string;
+      try {
+        const channelId = waitingForWatermarkText[userId];
+        const watermarkText = ((ctx.message as any)?.text ??
+          (ctx.message as any)?.caption ??
+          "") as string;
 
-      if (!watermarkText) {
-        await ctx.reply("Please send some text to use as the watermark.");
-        return;
+        if (!watermarkText) {
+          await ctx.reply("Please send some text to use as the watermark.");
+          return;
+        }
+
+        await prisma.watermark.create({
+          data: {
+            text: watermarkText,
+            channel: { connect: { id: channelId } },
+          },
+        });
+        delete waitingForWatermarkText[userId];
+        await ctx.reply(
+          "✔️ Watermark saved. I will attempt to add it to future posts in that channel (if I have admin rights to edit messages)."
+        );
+      } catch (e) {
+        console.error("Error while creating watermark", e);
+        await ctx.reply(
+          "❌ Could not save watermark. Please try again or contact support."
+        );
       }
-
-      await prisma.watermark.create({
-        data: {
-          text: watermarkText,
-          channel: { connect: { id: channelId } },
-        },
-      });
-
-      delete waitingForWatermarkText[userId];
-      await ctx.reply(
-        "✔️ Watermark saved. I will attempt to add it to future posts in that channel (if I have admin rights to edit messages)."
-      );
     }
   });
 };
