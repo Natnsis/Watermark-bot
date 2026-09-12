@@ -1,0 +1,136 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WatermarkCommand = void 0;
+const prisma_1 = require("../lib/prisma");
+// We'll keep track of command states per user while they provide channel and watermark
+const waitingForChannel = {};
+const waitingForWatermarkText = {};
+const WatermarkCommand = (bot) => {
+    bot.command("watermark", async (ctx) => {
+        const userId = ctx.from?.id.toString();
+        if (!userId)
+            return;
+        // Ask user to forward a message from their channel OR send the channel username (@mychannel)
+        waitingForChannel[userId] = true;
+        await ctx.reply("Please forward any message from the channel you want me to watermark, or send the channel username (e.g. @mychannel).\n\n" +
+            "Make sure you have added me to the channel and granted admin rights (edit messages) so I can add the watermark.");
+    });
+    // Handle text messages that could be channel usernames, and forwarded messages
+    bot.on("message", async (ctx, next) => {
+        const userId = ctx.from?.id?.toString();
+        if (!userId)
+            return;
+        // Only allow this flow via private chats
+        if (ctx.chat?.type !== "private")
+            return next();
+        // Skip processing if the user isn't in the watermark flow
+        if (!waitingForChannel[userId] && !waitingForWatermarkText[userId])
+            return next();
+        // Prevent processing of messages that are bot commands
+        const entities = (ctx.message?.entities ??
+            ctx.message?.caption_entities);
+        const isCommand = Array.isArray(entities) && entities.some((e) => e.type === "bot_command");
+        if (isCommand)
+            return next();
+        // If user is waiting for channel info
+        if (waitingForChannel[userId]) {
+            try {
+                // If forwarded from a chat, use forwarded chat info
+                const forwarded = ctx.message?.forward_from_chat;
+                let chatId;
+                let chatTitle;
+                if (forwarded) {
+                    chatId = forwarded.id;
+                    chatTitle = forwarded.title;
+                }
+                else if (ctx.message?.text) {
+                    const text = ctx.message.text.trim();
+                    // If user supplied @username or https://t.me/username
+                    if (text.startsWith("@")) {
+                        try {
+                            const chat = await bot.telegram.getChat(text);
+                            chatId = chat.id;
+                            chatTitle = chat.title ?? text;
+                        }
+                        catch (e) {
+                            await ctx.reply("Could not find that channel. Please make sure the username is correct and the bot can access it.");
+                            return;
+                        }
+                    }
+                    else if (text.startsWith("https://t.me/")) {
+                        const username = text.split("/").pop();
+                        if (username) {
+                            try {
+                                const chat = await bot.telegram.getChat("@" + username);
+                                chatId = chat.id;
+                                chatTitle = chat.title ?? username;
+                            }
+                            catch (e) {
+                                await ctx.reply("Could not find that channel. Please ensure the link is correct and I have access.");
+                                return;
+                            }
+                        }
+                    }
+                }
+                if (!chatId) {
+                    await ctx.reply("Please forward a message from the channel or send the channel username starting with @");
+                    return;
+                }
+                // Save or upsert the channel
+                const telegramId = chatId.toString();
+                // Upsert channel to avoid unique constraint races when multiple users register same channel concurrently.
+                let channel = await prisma_1.prisma.channel.upsert({
+                    where: { telegramId },
+                    update: chatTitle ? { name: chatTitle } : {},
+                    create: { telegramId, name: chatTitle },
+                });
+                // Connect or update the user to link to this channel
+                const user = await prisma_1.prisma.user.upsert({
+                    where: { telegramId: userId },
+                    create: {
+                        telegramId: userId,
+                        name: ctx.from?.first_name ?? "unknown",
+                        channelId: channel.id,
+                    },
+                    update: { channelId: channel.id },
+                });
+                // Ask for watermark text and move to next step
+                waitingForWatermarkText[userId] = channel.id;
+                waitingForChannel[userId] = false;
+                await ctx.reply("Nice! Now send the watermark text you want to attach to messages in that channel.");
+                return;
+            }
+            catch (e) {
+                console.error("Error while saving channel or linking user", e);
+                await ctx.reply("❌ Something went wrong while registering your channel. Please try again.");
+                return;
+            }
+        }
+        // If user is in the watermark text step, create a watermark record
+        if (waitingForWatermarkText[userId]) {
+            try {
+                const channelId = waitingForWatermarkText[userId];
+                const watermarkText = (ctx.message?.text ??
+                    ctx.message?.caption ??
+                    "");
+                if (!watermarkText) {
+                    await ctx.reply("Please send some text to use as the watermark.");
+                    return;
+                }
+                await prisma_1.prisma.watermark.create({
+                    data: {
+                        text: watermarkText,
+                        channel: { connect: { id: channelId } },
+                    },
+                });
+                delete waitingForWatermarkText[userId];
+                await ctx.reply("✔️ Watermark saved. I will attempt to add it to future posts in that channel (if I have admin rights to edit messages).");
+            }
+            catch (e) {
+                console.error("Error while creating watermark", e);
+                await ctx.reply("❌ Could not save watermark. Please try again or contact support.");
+            }
+        }
+    });
+};
+exports.WatermarkCommand = WatermarkCommand;
