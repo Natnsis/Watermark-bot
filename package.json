@@ -2,15 +2,16 @@
   "name": "watermark-bot",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/server.js",
-  "type": "commonjs",
+  "main": "src/index.ts",
+  "type": "module",
   "engines": {
     "node": "^20.19 || ^22.12 || >=24.0"
   },
   "scripts": {
-    "dev": "nodemon --watch src --ext ts --exec tsx src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "dev": "wrangler dev",
+    "build": "tsc --noEmit",
+    "start": "npx wrangler deploy",
+    "register-webhook": "tsx scripts/registerWebhook.ts",
     "postinstall": "npm run build"
   },
   "repository": {
@@ -25,19 +26,17 @@
   },
   "homepage": "https://github.com/Natnsis/Watermark-bot#readme",
   "devDependencies": {
-    "@types/express": "^5.0.5",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.15.6",
-    "nodemon": "^3.1.11",
     "prisma": "^7.0.1",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.132.0"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
     "pg": "^8.16.3",
     "telegraf": "^4.16.3",
     "@google/genai": "^1.2.0"

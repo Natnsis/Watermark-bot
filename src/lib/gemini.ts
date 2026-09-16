@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { GoogleGenAI } from "@google/genai";
 
 // Simple Gemini wrapper using Google's Generative Language REST endpoint.
