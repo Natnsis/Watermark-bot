@@ -11,7 +11,7 @@
  * Please import the `PrismaClient` class from the `client.ts` file instead.
  */
 
-import * as runtime from "@prisma/client/runtime/wasm-compiler-edge"
+import * as runtime from "@prisma/client/runtime/client"
 import type * as Prisma from "./prismaNamespace"
 
 
@@ -20,7 +20,7 @@ const config: runtime.GetPrismaClientConfig = {
   "clientVersion": "7.0.1",
   "engineVersion": "f09f2815f091dbba658cdcd2264306d88bb5bda6",
   "activeProvider": "postgresql",
-  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  runtime  = \"cloudflare\"\n  output   = \"../src/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel User {\n  id          Int          @id @default(autoincrement())\n  telegramId  String       @unique\n  name        String?\n  channelId   Int?\n  refinements Refinement[]\n  channel     Channel?     @relation(fields: [channelId], references: [id])\n}\n\nmodel Channel {\n  id         Int         @id @default(autoincrement())\n  telegramId String      @unique\n  name       String?\n  users      User[]\n  watermarks Watermark[]\n}\n\nmodel Watermark {\n  id        Int     @id @default(autoincrement())\n  text      String\n  channelId Int\n  channel   Channel @relation(fields: [channelId], references: [id])\n}\n\nmodel Refinement {\n  id           Int     @id @default(autoincrement())\n  userId       String  @unique\n  funnyRef     Boolean\n  grammarRef   Boolean\n  professional Boolean\n  user         User    @relation(fields: [userId], references: [telegramId])\n}\n",
+  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  runtime  = \"nodejs\"\n  output   = \"../src/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel User {\n  id          Int          @id @default(autoincrement())\n  telegramId  String       @unique\n  name        String?\n  channelId   Int?\n  refinements Refinement[]\n  channel     Channel?     @relation(fields: [channelId], references: [id])\n}\n\nmodel Channel {\n  id         Int         @id @default(autoincrement())\n  telegramId String      @unique\n  name       String?\n  users      User[]\n  watermarks Watermark[]\n}\n\nmodel Watermark {\n  id        Int     @id @default(autoincrement())\n  text      String\n  channelId Int\n  channel   Channel @relation(fields: [channelId], references: [id])\n}\n\nmodel Refinement {\n  id           Int     @id @default(autoincrement())\n  userId       String  @unique\n  funnyRef     Boolean\n  grammarRef   Boolean\n  professional Boolean\n  user         User    @relation(fields: [userId], references: [telegramId])\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
@@ -29,16 +29,20 @@ const config: runtime.GetPrismaClientConfig = {
 }
 
 config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"telegramId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"channelId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"refinements\",\"kind\":\"object\",\"type\":\"Refinement\",\"relationName\":\"RefinementToUser\"},{\"name\":\"channel\",\"kind\":\"object\",\"type\":\"Channel\",\"relationName\":\"ChannelToUser\"}],\"dbName\":null},\"Channel\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"telegramId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"users\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"ChannelToUser\"},{\"name\":\"watermarks\",\"kind\":\"object\",\"type\":\"Watermark\",\"relationName\":\"ChannelToWatermark\"}],\"dbName\":null},\"Watermark\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"text\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"channelId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"channel\",\"kind\":\"object\",\"type\":\"Channel\",\"relationName\":\"ChannelToWatermark\"}],\"dbName\":null},\"Refinement\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"funnyRef\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"grammarRef\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"professional\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"RefinementToUser\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+
+async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
+  const { Buffer } = await import('node:buffer')
+  const wasmArray = Buffer.from(wasmBase64, 'base64')
+  return new WebAssembly.Module(wasmArray)
+}
+
 config.compilerWasm = {
-  getRuntime: async () => await import("./query_compiler_bg.js"),
+  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_bg.postgresql.mjs"),
 
   getQueryCompilerWasmModule: async () => {
-    const { default: module } = await import("./query_compiler_bg.wasm?module")
-    return module
+    const { wasm } = await import("@prisma/client/runtime/query_compiler_bg.postgresql.wasm-base64.mjs")
+    return await decodeBase64AsWasm(wasm)
   }
-}
-if (typeof globalThis !== 'undefined' && globalThis['DEBUG'] || (typeof process !== 'undefined' && process.env && process.env.DEBUG) || undefined) {
-  runtime.Debug.enable(typeof globalThis !== 'undefined' && globalThis['DEBUG'] || (typeof process !== 'undefined' && process.env && process.env.DEBUG) || undefined)
 }
 
 

@@ -1,3 +1,5 @@
+import "dotenv/config";
+import http from "node:http";
 import { Telegraf, Context } from "telegraf";
 import { prisma } from "./lib/prisma";
 import { startCommand } from "./commands/start";
@@ -7,52 +9,47 @@ import { WatermarkCommand } from "./commands/watermark";
 import { helpCommand } from "./commands/help";
 import { SettingsCommand } from "./commands/settings";
 
-let bot: Telegraf<Context> | undefined;
+const bot = new Telegraf<Context>(process.env.BOT_TOKEN!);
 
-const getBot = () => {
-  if (!bot) {
-    bot = new Telegraf<Context>(process.env.BOT_TOKEN!);
-    [startCommand, PostCommand, PreferenceCommand, WatermarkCommand, helpCommand, SettingsCommand].forEach(
-      (command) => command(bot!)
-    );
-    bot!.on("channel_post", async (ctx) => {
-      const post = ctx.channelPost;
-      const chat = post?.chat;
-      if (!chat || !post) return;
+[startCommand, PostCommand, PreferenceCommand, WatermarkCommand, helpCommand, SettingsCommand].forEach((command) =>
+  command(bot)
+);
 
-      const telegramId = chat.id.toString();
-      const messageId = post.message_id;
-      if (!messageId) return;
+bot.on("channel_post", async (ctx) => {
+  const post = ctx.channelPost;
+  const chat = post?.chat;
+  if (!chat || !post) return;
 
-      try {
-        const channel = await prisma.channel.findUnique({ where: { telegramId } });
-        if (!channel) return;
+  const telegramId = chat.id.toString();
+  const messageId = post.message_id;
+  if (!messageId) return;
 
-        const watermark = await prisma.watermark.findFirst({
-          where: { channelId: channel.id },
-          orderBy: { id: "desc" },
-        });
-        if (!watermark) return;
+  try {
+    const channel = await prisma.channel.findUnique({ where: { telegramId } });
+    if (!channel) return;
 
-        const postContent = getPostContent(post);
-        if (!postContent) return;
-
-        if (postContent.type === "text") {
-          await bot!.telegram.editMessageText(chat.id, messageId, undefined, `${postContent.content}\n\n${watermark.text}`, {
-            parse_mode: "Markdown",
-          });
-        } else if (postContent.type === "caption") {
-          await bot!.telegram.editMessageCaption(chat.id, messageId, undefined, `${postContent.content}\n\n${watermark.text}`, {
-            parse_mode: "Markdown",
-          });
-        }
-      } catch (error) {
-        console.error("Unable to append watermark to channel post:", error);
-      }
+    const watermark = await prisma.watermark.findFirst({
+      where: { channelId: channel.id },
+      orderBy: { id: "desc" },
     });
+    if (!watermark) return;
+
+    const postContent = getPostContent(post);
+    if (!postContent) return;
+
+    if (postContent.type === "text") {
+      await bot.telegram.editMessageText(chat.id, messageId, undefined, `${postContent.content}\n\n${watermark.text}`, {
+        parse_mode: "Markdown",
+      });
+    } else if (postContent.type === "caption") {
+      await bot.telegram.editMessageCaption(chat.id, messageId, undefined, `${postContent.content}\n\n${watermark.text}`, {
+        parse_mode: "Markdown",
+      });
+    }
+  } catch (error) {
+    console.error("Unable to append watermark to channel post:", error);
   }
-  return bot;
-};
+});
 
 const getPostContent = (post: any) => {
   if (!post) return null;
@@ -61,22 +58,32 @@ const getPostContent = (post: any) => {
   return null;
 };
 
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
+const PORT = Number(process.env.PORT || 3000);
+const WEBHOOK_PATH = process.env.WEBHOOK_PATH || "/webhook";
 
-    if (request.method === "GET" && url.pathname === "/health") {
-      return new Response(JSON.stringify({ message: "server is healthy" }), {
-        headers: { "content-type": "application/json" },
-      });
-    }
+const webhookHandler = bot.webhookCallback(WEBHOOK_PATH);
 
-    if (request.method === "POST") {
-      const update = await request.json();
-      await getBot().handleUpdate(update);
-      return new Response("ok", { status: 200 });
-    }
+const server = http.createServer((req, res) => {
+  if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ message: "server is healthy" }));
+    return;
+  }
+  webhookHandler(req, res);
+});
 
-    return new Response("Not found", { status: 404 });
-  },
+server.listen(PORT, () => {
+  console.log(`Watermark bot is listening on http://localhost:${PORT}${WEBHOOK_PATH}`);
+});
+
+const shutdown = (signal: string) => {
+  console.log(`Received ${signal}, shutting down...`);
+  server.close(() => {
+    bot.stop(signal);
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
 };
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));
