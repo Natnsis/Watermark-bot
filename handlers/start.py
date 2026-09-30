@@ -1,7 +1,7 @@
 import html
 import logging
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update, User
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Update, User
 from telegram.constants import KeyboardButtonStyle, ParseMode
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
@@ -10,6 +10,11 @@ from db import get_session
 from services import get_user_channel
 
 logger = logging.getLogger(__name__)
+
+# Served from the public repo; shown as a large preview above the menu text so the
+# menu stays a normal text message that other screens can edit in place.
+WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/Natnsis/Watermark-bot/main/assets/start.png"
+MENU_PREVIEW = LinkPreviewOptions(url=WELCOME_IMAGE_URL, prefer_large_media=True, show_above_text=True)
 
 # Shown on the bot's profile and when the bot is shared (max 120 characters).
 SHORT_DESCRIPTION = (
@@ -104,7 +109,9 @@ HELP_KEYBOARD = InlineKeyboardMarkup([[back_to_menu_button()]])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text, keyboard = await render_menu(update.effective_user)
-    await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    await update.message.reply_text(
+        text, reply_markup=keyboard, parse_mode=ParseMode.HTML, link_preview_options=MENU_PREVIEW
+    )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -127,7 +134,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # A button from an older version of the menu: swap in the current menu.
         await query.answer("Menu updated, tap again")
     text, keyboard = await render_menu(update.effective_user)
-    await query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    await query.edit_message_text(
+        text, reply_markup=keyboard, parse_mode=ParseMode.HTML, link_preview_options=MENU_PREVIEW
+    )
 
 
 async def expired_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
