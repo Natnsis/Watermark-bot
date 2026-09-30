@@ -3,3 +3,4 @@ SQLAlchemy==2.0.35
 asyncpg==0.31.0
 python-dotenv==1.0.1
 Pillow==12.3.0
+tzdata==2025.2
