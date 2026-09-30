@@ -8,6 +8,7 @@ from telegram.constants import KeyboardButtonStyle, MessageLimit, ParseMode
 from telegram.error import Forbidden, TelegramError
 from telegram.ext import CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 
+import year_progress
 from config import TIMEZONE
 from db import get_session
 from handlers.start import back_to_menu_button
@@ -15,9 +16,12 @@ from models import WeeklyCount
 from services import (
     activate_weekly_count,
     deactivate_weekly_count,
+    get_progress_style,
     get_user_channel,
     get_weekly_count,
     list_active_weekly_counts,
+    mark_recap_headings_used,
+    pick_recap_heading,
 )
 
 logger = logging.getLogger(__name__)
@@ -184,7 +188,8 @@ count_conversation = ConversationHandler(
 # --- weekly recap ------------------------------------------------------------
 
 
-RECAP_KEYS = ("recap_completion", "recap_progress", "recap_photo")
+RECAP_KEYS = ("recap_completion", "recap_progress", "recap_photo", "recap_headings")
+SECTIONS = ("completion", "progress")
 CANCEL_BUTTON = InlineKeyboardButton("✖️ Cancel", callback_data="recap:cancel")
 
 
@@ -193,21 +198,21 @@ def _bullets(text: str) -> list[str]:
     return [f"- {html.escape(line)}" for line in lines if line]
 
 
-def build_recap_post(count: int, monday: date, completion: str, progress: str, watermark: str | None) -> str:
+def build_recap_post(
+    count: int, monday: date, sections: list[tuple[str, str]], watermark: str | None, progress_style: str | None = None
+) -> str:
+    """`sections` is a list of (heading, answer) pairs."""
     last_week = (monday - timedelta(days=7)).isocalendar().week
     parts = [
         "It's Monday once more\n"
         f"Good luck with week {monday.isocalendar().week} [{count}]\n"
-        f"{weeks_left_in_year(monday)} weeks left in {monday.year}",
+        f"{html.escape(year_progress.render(progress_style, monday))}",
         f"Week {last_week} feats :",
     ]
-    for title, answer in (
-        ("Completion wins // Closing loops", completion),
-        ("Progress wins // Moving something forward", progress),
-    ):
+    for heading, answer in sections:
         bullets = _bullets(answer)
         if bullets:
-            parts.append(f"<blockquote>{title}</blockquote>\n" + "\n".join(bullets))
+            parts.append(f"<blockquote>{html.escape(heading)}</blockquote>\n" + "\n".join(bullets))
     if watermark:
         parts.append(html.escape(watermark))
     return "\n\n".join(parts)
@@ -234,13 +239,15 @@ async def _recap_text(user_id: int, user_data: dict) -> tuple[str, int, str]:
     async with get_session() as session:
         row = await get_weekly_count(session, user_id)
         channel = await get_user_channel(session, user_id)
+        progress_style = await get_progress_style(session, user_id)
     monday = current_monday()
+    headings = user_data["recap_headings"]
     text = build_recap_post(
         week_count_for(row, monday),
         monday,
-        user_data.get("recap_completion", ""),
-        user_data.get("recap_progress", ""),
+        [(headings[section][1], user_data.get(f"recap_{section}", "")) for section in SECTIONS],
         channel.watermark_text,
+        progress_style,
     )
     return text, channel.channel_id, channel.channel_title or str(channel.channel_id)
 
@@ -268,8 +275,15 @@ async def recap_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
     await query.answer()
     await query.edit_message_reply_markup(None)
+    return await _begin_recap(update, context)
+
+
+async def _begin_recap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     for key in RECAP_KEYS:
         context.user_data.pop(key, None)
+    async with get_session() as session:
+        headings = {section: await pick_recap_heading(session, update.effective_user.id, section) for section in SECTIONS}
+    context.user_data["recap_headings"] = {section: (h.id, h.text) for section, h in headings.items()}
     return await _ask_completion(update.effective_chat.send_message)
 
 
@@ -352,6 +366,10 @@ async def post_recap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
         return PREVIEW
 
+    async with get_session() as session:
+        heading_ids = [heading_id for heading_id, _ in context.user_data["recap_headings"].values()]
+        await mark_recap_headings_used(session, update.effective_user.id, heading_ids)
+
     await query.answer("Posted ✅")
     await query.edit_message_reply_markup(None)
     for key in RECAP_KEYS:
@@ -363,9 +381,7 @@ async def post_recap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def restart_recap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.callback_query.answer()
     await update.callback_query.edit_message_reply_markup(None)
-    for key in RECAP_KEYS:
-        context.user_data.pop(key, None)
-    return await _ask_completion(update.effective_chat.send_message)
+    return await _begin_recap(update, context)
 
 
 async def cancel_recap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

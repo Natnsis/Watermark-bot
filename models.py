@@ -110,3 +110,31 @@ class WeeklyCount(Base):
     start_monday: Mapped[date] = mapped_column(Date)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RecapHeading(Base):
+    __tablename__ = "recap_headings"
+    __table_args__ = (UniqueConstraint("section", "text", name="uq_recap_heading"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    section: Mapped[str] = mapped_column(String(20))  # "completion" or "progress"
+    text: Mapped[str] = mapped_column(String(255))
+
+
+class RecapHeadingUse(Base):
+    """Headings a user has already had, so each one comes up once before any repeats."""
+
+    __tablename__ = "recap_heading_uses"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    heading_id: Mapped[int] = mapped_column(Integer, ForeignKey("recap_headings.id", ondelete="CASCADE"), primary_key=True)
+
+
+class ProgressStyle(Base):
+    __tablename__ = "progress_styles"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    style: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # "off", "daily", "weekly", "monthly" or "percent"
+    schedule: Mapped[str] = mapped_column(String(20), default="off", server_default="off")
+    last_posted_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)

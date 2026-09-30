@@ -14,8 +14,10 @@ async def build_menu(user_id: int) -> InlineKeyboardMarkup:
 
     if has_channel:
         week_button = InlineKeyboardButton("📅 Week Count", callback_data="week:open", style=KeyboardButtonStyle.SUCCESS)
+        progress_button = InlineKeyboardButton("📈 Progress", callback_data="prog:open", style=KeyboardButtonStyle.SUCCESS)
     else:
         week_button = InlineKeyboardButton("🔒 Week Count", callback_data="menu:locked")
+        progress_button = InlineKeyboardButton("🔒 Progress", callback_data="menu:locked")
 
     return InlineKeyboardMarkup(
         [
@@ -24,7 +26,7 @@ async def build_menu(user_id: int) -> InlineKeyboardMarkup:
                 week_button,
             ],
             [
-                InlineKeyboardButton("📈 Progress", callback_data="menu:progress", style=KeyboardButtonStyle.SUCCESS),
+                progress_button,
                 InlineKeyboardButton("📊 Stat Teller", callback_data="menu:stat_teller", style=KeyboardButtonStyle.PRIMARY),
             ],
         ]

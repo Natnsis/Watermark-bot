@@ -48,6 +48,13 @@ def get_session() -> AsyncSession:
     return _session_factory()
 
 
+async def run_statements(statements: tuple[str, ...]) -> None:
+    assert _engine is not None, "init_db must be called first"
+    async with _engine.begin() as conn:
+        for statement in statements:
+            await conn.execute(text(statement))
+
+
 async def create_table(model: type[Base]) -> None:
     assert _engine is not None, "init_db must be called first"
     async with _engine.begin() as conn:

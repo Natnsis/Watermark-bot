@@ -2,10 +2,20 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import ChannelWatermark, Preference, Project, ProjectLogEntry, User, WeeklyCount
+from models import (
+    ChannelWatermark,
+    Preference,
+    ProgressStyle,
+    Project,
+    ProjectLogEntry,
+    RecapHeading,
+    RecapHeadingUse,
+    User,
+    WeeklyCount,
+)
 
 
 async def get_or_create_user(session: AsyncSession, user_id: int, username: str | None) -> User:
@@ -311,4 +321,81 @@ async def deactivate_weekly_count(session: AsyncSession, user_id: int) -> None:
 
 async def list_active_weekly_counts(session: AsyncSession) -> list[WeeklyCount]:
     result = await session.execute(select(WeeklyCount).where(WeeklyCount.active.is_(True)))
+    return list(result.scalars().all())
+
+
+# --- recap headings ----------------------------------------------------------
+
+
+async def seed_recap_headings(session: AsyncSession, headings_by_section: dict[str, list[str]]) -> None:
+    existing = set((await session.execute(select(RecapHeading.section, RecapHeading.text))).all())
+    for section, headings in headings_by_section.items():
+        for text in headings:
+            if (section, text) not in existing:
+                session.add(RecapHeading(section=section, text=text))
+    await session.commit()
+
+
+async def pick_recap_heading(session: AsyncSession, user_id: int, section: str) -> RecapHeading:
+    """Random heading this user hasn't had yet; once all are used, the cycle starts over."""
+    used = select(RecapHeadingUse.heading_id).where(RecapHeadingUse.user_id == user_id)
+    query = select(RecapHeading).where(RecapHeading.section == section).order_by(func.random()).limit(1)
+
+    heading = (await session.execute(query.where(RecapHeading.id.not_in(used)))).scalar_one_or_none()
+    if heading is None:
+        section_ids = select(RecapHeading.id).where(RecapHeading.section == section)
+        await session.execute(
+            delete(RecapHeadingUse).where(RecapHeadingUse.user_id == user_id, RecapHeadingUse.heading_id.in_(section_ids))
+        )
+        await session.commit()
+        heading = (await session.execute(query)).scalar_one()
+    return heading
+
+
+async def mark_recap_headings_used(session: AsyncSession, user_id: int, heading_ids: list[int]) -> None:
+    for heading_id in heading_ids:
+        await session.merge(RecapHeadingUse(user_id=user_id, heading_id=heading_id))
+    await session.commit()
+
+
+# --- year progress style -----------------------------------------------------
+
+
+async def get_progress_style(session: AsyncSession, user_id: int) -> str | None:
+    row = await session.get(ProgressStyle, user_id)
+    return row.style if row else None
+
+
+async def get_progress_settings(session: AsyncSession, user_id: int) -> ProgressStyle | None:
+    return await session.get(ProgressStyle, user_id)
+
+
+async def _get_or_create_progress_settings(session: AsyncSession, user_id: int) -> ProgressStyle:
+    row = await session.get(ProgressStyle, user_id)
+    if row is None:
+        row = ProgressStyle(user_id=user_id, schedule="off")
+        session.add(row)
+    return row
+
+
+async def set_progress_style(session: AsyncSession, user_id: int, style: str) -> None:
+    row = await _get_or_create_progress_settings(session, user_id)
+    row.style = style
+    await session.commit()
+
+
+async def set_progress_schedule(session: AsyncSession, user_id: int, schedule: str) -> None:
+    row = await _get_or_create_progress_settings(session, user_id)
+    row.schedule = schedule
+    await session.commit()
+
+
+async def set_last_posted_percent(session: AsyncSession, user_id: int, percent: int) -> None:
+    row = await _get_or_create_progress_settings(session, user_id)
+    row.last_posted_percent = percent
+    await session.commit()
+
+
+async def list_scheduled_progress(session: AsyncSession) -> list[ProgressStyle]:
+    result = await session.execute(select(ProgressStyle).where(ProgressStyle.schedule != "off"))
     return list(result.scalars().all())
