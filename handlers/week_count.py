@@ -20,6 +20,7 @@ from services import (
     get_user_channel,
     get_weekly_count,
     list_active_weekly_counts,
+    log_activity,
     mark_recap_headings_used,
     pick_recap_heading,
 )
@@ -369,6 +370,7 @@ async def post_recap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     async with get_session() as session:
         heading_ids = [heading_id for heading_id, _ in context.user_data["recap_headings"].values()]
         await mark_recap_headings_used(session, update.effective_user.id, heading_ids)
+        await log_activity(session, update.effective_user.id, "recap_post", current_monday())
 
     await query.answer("Posted ✅")
     await query.edit_message_reply_markup(None)

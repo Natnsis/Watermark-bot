@@ -15,9 +15,11 @@ async def build_menu(user_id: int) -> InlineKeyboardMarkup:
     if has_channel:
         week_button = InlineKeyboardButton("📅 Week Count", callback_data="week:open", style=KeyboardButtonStyle.SUCCESS)
         progress_button = InlineKeyboardButton("📈 Progress", callback_data="prog:open", style=KeyboardButtonStyle.SUCCESS)
+        stats_button = InlineKeyboardButton("📊 Stat Teller", callback_data="stats:open", style=KeyboardButtonStyle.PRIMARY)
     else:
         week_button = InlineKeyboardButton("🔒 Week Count", callback_data="menu:locked")
         progress_button = InlineKeyboardButton("🔒 Progress", callback_data="menu:locked")
+        stats_button = InlineKeyboardButton("🔒 Stat Teller", callback_data="menu:locked")
 
     return InlineKeyboardMarkup(
         [
@@ -27,7 +29,7 @@ async def build_menu(user_id: int) -> InlineKeyboardMarkup:
             ],
             [
                 progress_button,
-                InlineKeyboardButton("📊 Stat Teller", callback_data="menu:stat_teller", style=KeyboardButtonStyle.PRIMARY),
+                stats_button,
             ],
         ]
     )
@@ -49,7 +51,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     elif query.data == "menu:locked":
         await query.answer("🔒 Set up your channel with 🖼 Watermark first to unlock this.", show_alert=True)
     else:
-        await query.answer("Coming soon")
+        # A button from an older version of the menu: swap in the current menu.
+        await query.answer("Menu updated, tap again")
+        await query.edit_message_text(MENU_TEXT, reply_markup=await build_menu(update.effective_user.id))
 
 
 async def expired_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

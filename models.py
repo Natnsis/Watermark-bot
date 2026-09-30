@@ -138,3 +138,13 @@ class ProgressStyle(Base):
     # "off", "daily", "weekly", "monthly" or "percent"
     schedule: Mapped[str] = mapped_column(String(20), default="off", server_default="off")
     last_posted_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # "recap_post" or "progress_post"
+    week_monday: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

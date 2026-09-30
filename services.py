@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import (
+    ActivityLog,
     ChannelWatermark,
     Preference,
     ProgressStyle,
@@ -399,3 +400,38 @@ async def set_last_posted_percent(session: AsyncSession, user_id: int, percent: 
 async def list_scheduled_progress(session: AsyncSession) -> list[ProgressStyle]:
     result = await session.execute(select(ProgressStyle).where(ProgressStyle.schedule != "off"))
     return list(result.scalars().all())
+
+
+# --- activity & stats --------------------------------------------------------
+
+
+async def log_activity(session: AsyncSession, user_id: int, kind: str, week_monday: date | None = None) -> None:
+    session.add(ActivityLog(user_id=user_id, kind=kind, week_monday=week_monday))
+    await session.commit()
+
+
+async def get_recap_weeks(session: AsyncSession, user_id: int) -> set[date]:
+    result = await session.execute(
+        select(ActivityLog.week_monday)
+        .where(ActivityLog.user_id == user_id, ActivityLog.kind == "recap_post")
+        .distinct()
+    )
+    return set(result.scalars().all())
+
+
+async def count_activity(
+    session: AsyncSession, user_id: int | None = None, kind: str | None = None, since: datetime | None = None
+) -> int:
+    query = select(func.count()).select_from(ActivityLog)
+    if user_id is not None:
+        query = query.where(ActivityLog.user_id == user_id)
+    if kind is not None:
+        query = query.where(ActivityLog.kind == kind)
+    if since is not None:
+        query = query.where(ActivityLog.created_at >= since)
+    return (await session.execute(query)).scalar_one()
+
+
+async def count_users_with_channel(session: AsyncSession) -> int:
+    result = await session.execute(select(func.count(func.distinct(ChannelWatermark.user_id))))
+    return result.scalar_one()

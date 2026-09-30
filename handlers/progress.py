@@ -14,6 +14,7 @@ from services import (
     get_progress_settings,
     get_user_channel,
     list_scheduled_progress,
+    log_activity,
     set_last_posted_percent,
     set_progress_schedule,
     set_progress_style,
@@ -59,6 +60,7 @@ async def post_progress(bot: Bot, user_id: int) -> str:
             parse_mode=ParseMode.HTML,
         )
         await set_last_posted_percent(session, user_id, percent_done(today))
+        await log_activity(session, user_id, "progress_post")
     return channel.channel_title or str(channel.channel_id)
 
 
