@@ -9,6 +9,7 @@ from handlers.progress import progress_handler, schedule_progress_posts
 from handlers.stats import stats_handler
 from handlers.start import expired_button, menu_callback, start
 from handlers.week_count import count_conversation, recap_conversation, schedule_monday_prompt, week_screen_handler
+from health import start_health_server
 from models import ActivityLog, ChannelWatermark, ProgressStyle, RecapHeading, RecapHeadingUse, WeeklyCount
 from recap_headings import COMPLETION_HEADINGS, PROGRESS_HEADINGS
 from services import seed_recap_headings
@@ -37,6 +38,7 @@ async def _setup(application: Application) -> None:
         await seed_recap_headings(session, {"completion": COMPLETION_HEADINGS, "progress": PROGRESS_HEADINGS})
     schedule_monday_prompt(application)
     schedule_progress_posts(application)
+    await start_health_server()
 
 
 def main() -> None:
