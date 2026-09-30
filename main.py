@@ -7,7 +7,7 @@ from db import create_table, get_session, init_db, run_statements
 from handlers.channel_watermark import channel_post_handler, watermark_conversation
 from handlers.progress import progress_handler, schedule_progress_posts
 from handlers.stats import stats_handler
-from handlers.start import expired_button, menu_callback, start
+from handlers.start import expired_button, help_command, menu_callback, start, update_bot_profile
 from handlers.week_count import count_conversation, recap_conversation, schedule_monday_prompt, week_screen_handler
 from health import start_health_server
 from models import ActivityLog, ChannelWatermark, ProgressStyle, RecapHeading, RecapHeadingUse, WeeklyCount
@@ -39,6 +39,7 @@ async def _setup(application: Application) -> None:
     schedule_monday_prompt(application)
     schedule_progress_posts(application)
     await start_health_server()
+    await update_bot_profile(application.bot)
 
 
 def main() -> None:
@@ -50,6 +51,7 @@ def main() -> None:
     application.add_handler(count_conversation)
     application.add_handler(recap_conversation)
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(week_screen_handler)
     application.add_handler(progress_handler)
     application.add_handler(stats_handler)
